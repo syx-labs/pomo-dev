@@ -38,12 +38,17 @@ export const useOllamaStore = defineStore("ollama", () => {
 
   async function checkHealth() {
     checking.value = true;
+    const wasRunning = isRunning.value;
     try {
       isRunning.value = await ollamaCheckHealth();
     } catch {
       isRunning.value = false;
     } finally {
       checking.value = false;
+    }
+    // If Ollama just became available, load models and active model
+    if (isRunning.value && !wasRunning) {
+      await Promise.all([fetchLocalModels(), loadActiveModel()]);
     }
   }
 
@@ -72,8 +77,12 @@ export const useOllamaStore = defineStore("ollama", () => {
   }
 
   async function setActiveModel(name: string) {
-    await setSetting("ai_model", name);
-    activeModel.value = name;
+    try {
+      await setSetting("ai_model", name);
+      activeModel.value = name;
+    } catch {
+      // State not updated if persist fails — keeps local and DB in sync
+    }
   }
 
   async function pullModel(name: string) {
@@ -100,6 +109,7 @@ export const useOllamaStore = defineStore("ollama", () => {
       await ollamaDeleteModel(name);
       await fetchLocalModels();
       if (activeModel.value === name) {
+        await setSetting("ai_model", "");
         activeModel.value = "";
       }
     } finally {
@@ -107,18 +117,18 @@ export const useOllamaStore = defineStore("ollama", () => {
     }
   }
 
-  let unlistenProgress: (() => void) | null = null;
-  let unlistenComplete: (() => void) | null = null;
+  const unlistenProgress = ref<(() => void) | null>(null);
+  const unlistenComplete = ref<(() => void) | null>(null);
 
   async function setupEventListeners() {
-    unlistenProgress?.();
-    unlistenComplete?.();
+    unlistenProgress.value?.();
+    unlistenComplete.value?.();
 
-    unlistenProgress = await onOllamaPullProgress((payload) => {
+    unlistenProgress.value = await onOllamaPullProgress((payload) => {
       pullProgress.value = payload;
     });
 
-    unlistenComplete = await onOllamaPullComplete(async (payload) => {
+    unlistenComplete.value = await onOllamaPullComplete(async (payload) => {
       pullingModel.value = null;
       pullProgress.value = null;
       if (payload.success) {

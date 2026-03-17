@@ -1035,7 +1035,10 @@ pub fn get_event_log(
 fn get_ollama_base_url(conn: &Connection) -> Result<String, String> {
     db::get_setting(conn, "ai_base_url")
         .map_err(|e| e.to_string())
-        .map(|v| v.unwrap_or_else(|| "http://localhost:11434".into()))
+        .map(|v| match v {
+            Some(s) if !s.trim().is_empty() => s,
+            _ => "http://localhost:11434".into(),
+        })
 }
 
 #[tauri::command]

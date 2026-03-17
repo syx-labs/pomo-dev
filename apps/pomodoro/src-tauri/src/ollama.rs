@@ -192,6 +192,7 @@ fn pull_model_inner(
 
     let reader = std::io::BufReader::new(resp);
     let mut last_emit = std::time::Instant::now() - PROGRESS_THROTTLE;
+    let mut received_success = false;
 
     for line in reader.lines() {
         if cancel.load(Ordering::Relaxed) {
@@ -210,6 +211,15 @@ fn pull_model_inner(
                 return Err(err.to_string());
             }
 
+            let status = json
+                .get("status")
+                .and_then(|s| s.as_str())
+                .unwrap_or("");
+
+            if status == "success" {
+                received_success = true;
+            }
+
             // Throttle progress events to avoid IPC spam
             let now = std::time::Instant::now();
             if now.duration_since(last_emit) < PROGRESS_THROTTLE {
@@ -217,11 +227,6 @@ fn pull_model_inner(
             }
             last_emit = now;
 
-            let status = json
-                .get("status")
-                .and_then(|s| s.as_str())
-                .unwrap_or("")
-                .to_string();
             let total = json.get("total").and_then(|t| t.as_u64()).unwrap_or(0);
             let completed = json
                 .get("completed")
@@ -235,7 +240,7 @@ fn pull_model_inner(
 
             let progress = PullProgress {
                 model: name.to_string(),
-                status,
+                status: status.to_string(),
                 total,
                 completed,
                 percent,
@@ -244,7 +249,11 @@ fn pull_model_inner(
         }
     }
 
-    Ok(())
+    if received_success {
+        Ok(())
+    } else {
+        Err("Pull ended without success confirmation".into())
+    }
 }
 
 #[cfg(test)]

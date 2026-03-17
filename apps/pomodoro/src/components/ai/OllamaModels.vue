@@ -5,7 +5,7 @@ import { useOllamaStore } from "@/stores/ollama";
 const store = useOllamaStore();
 
 function formatSize(mb: number): string {
-  if (mb >= 1000) return `${(mb / 1000).toFixed(1)} GB`;
+  if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`;
   return `${mb} MB`;
 }
 
