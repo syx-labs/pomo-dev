@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use chrono::Utc;
@@ -17,6 +17,7 @@ use crate::models::{
     Goal, HeatmapEntry, HourlyStats, PomodoroSession, ProjectStats, SessionType, StreakData, Task,
     TaskStatus, TimerState,
 };
+use crate::ollama;
 use crate::timer::PomodoroTimer;
 
 pub struct AppState {
@@ -24,6 +25,7 @@ pub struct AppState {
     pub db: Mutex<Connection>,
     pub audio: Mutex<AudioEngine>,
     pub shutdown: Arc<AtomicBool>,
+    pub ollama_cancel: Arc<AtomicBool>,
     pub dispatcher: EventDispatcher,
 }
 
@@ -1026,4 +1028,66 @@ pub fn get_event_log(
     let conn = state.db.lock_or_err("get_event_log")?;
     db::get_event_log(&conn, integration_id.as_deref(), limit.unwrap_or(50))
         .map_err(|e| e.to_string())
+}
+
+// ── Ollama Model Commands ────────────────────────────────────────────────────
+
+fn get_ollama_base_url(conn: &Connection) -> Result<String, String> {
+    db::get_setting(conn, "ai_base_url")
+        .map_err(|e| e.to_string())
+        .map(|v| v.unwrap_or_else(|| "http://localhost:11434".into()))
+}
+
+#[tauri::command]
+pub fn ollama_check_health(state: State<'_, AppState>) -> Result<bool, String> {
+    let conn = state.db.lock_or_err("ollama_check_health")?;
+    let base_url = get_ollama_base_url(&conn)?;
+    drop(conn);
+    Ok(ollama::check_health(&base_url))
+}
+
+#[tauri::command]
+pub fn ollama_list_local_models(
+    state: State<'_, AppState>,
+) -> Result<Vec<ollama::OllamaModel>, String> {
+    let conn = state.db.lock_or_err("ollama_list_local_models")?;
+    let base_url = get_ollama_base_url(&conn)?;
+    drop(conn);
+    ollama::list_local_models(&base_url)
+}
+
+#[tauri::command]
+pub fn ollama_get_curated_models() -> Vec<ollama::CuratedModel> {
+    ollama::get_curated_models()
+}
+
+#[tauri::command]
+pub fn ollama_pull_model(
+    app_handle: tauri::AppHandle,
+    state: State<'_, AppState>,
+    name: String,
+) -> Result<(), String> {
+    let conn = state.db.lock_or_err("ollama_pull_model")?;
+    let base_url = get_ollama_base_url(&conn)?;
+    drop(conn);
+
+    state.ollama_cancel.store(false, Ordering::Relaxed);
+    let cancel = state.ollama_cancel.clone();
+
+    ollama::pull_model(app_handle, base_url, name, cancel);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn ollama_cancel_pull(state: State<'_, AppState>) -> Result<(), String> {
+    state.ollama_cancel.store(true, Ordering::Relaxed);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn ollama_delete_model(state: State<'_, AppState>, name: String) -> Result<(), String> {
+    let conn = state.db.lock_or_err("ollama_delete_model")?;
+    let base_url = get_ollama_base_url(&conn)?;
+    drop(conn);
+    ollama::delete_model(&base_url, &name)
 }

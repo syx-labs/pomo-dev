@@ -8,6 +8,7 @@ mod db;
 mod error;
 mod integrations;
 mod models;
+mod ollama;
 mod timer;
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -81,6 +82,7 @@ fn main() {
                 db: Mutex::new(conn),
                 audio: Mutex::new(audio_engine),
                 shutdown: shutdown.clone(),
+                ollama_cancel: Arc::new(AtomicBool::new(false)),
                 dispatcher: integrations::EventDispatcher::new(),
             };
             app.manage(state);
@@ -228,6 +230,12 @@ fn main() {
             commands::list_integrations,
             commands::test_integration,
             commands::get_event_log,
+            commands::ollama_check_health,
+            commands::ollama_list_local_models,
+            commands::ollama_get_curated_models,
+            commands::ollama_pull_model,
+            commands::ollama_cancel_pull,
+            commands::ollama_delete_model,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
