@@ -1,0 +1,156 @@
+/* ===== Dark Theme (default) ===== */
+:root,
+[data-theme="dark"] {
+  /* Background */
+  --bg-primary: #09090b; /* zinc-950 */
+  --bg-secondary: #18181b; /* zinc-900 */
+  --bg-card: #27272a; /* zinc-800 */
+  --bg-hover: #3f3f46; /* zinc-700 */
+
+  /* Text */
+  --text-primary: #fafafa; /* zinc-50 */
+  --text-secondary: #a1a1aa; /* zinc-400 */
+  --text-muted: #71717a; /* zinc-500 */
+
+  /* Borders */
+  --border-default: #3f3f46; /* zinc-700 */
+  --border-subtle: #27272a; /* zinc-800 */
+
+  /* Accent colors by timer state */
+  --color-work: #10b981; /* emerald-500 */
+  --color-work-dim: #065f46; /* emerald-800 */
+  --color-short-break: #0ea5e9; /* sky-500 */
+  --color-short-break-dim: #075985; /* sky-800 */
+  --color-long-break: #8b5cf6; /* violet-500 */
+  --color-long-break-dim: #5b21b6; /* violet-800 */
+
+  /* Priority colors */
+  --color-priority-high: #ef4444; /* red-500 */
+  --color-priority-medium: #f59e0b; /* amber-500 */
+  --color-priority-low: #3b82f6; /* blue-500 */
+
+  /* Semantic / derived colors */
+  --color-success: #10b981;
+  --color-error: #ef4444;
+  --color-status-neutral: #71717a;
+
+  /* Shadows & overlays */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-toast: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-fab: 0 4px 12px rgba(16, 185, 129, 0.3);
+  --shadow-fab-hover: 0 6px 20px rgba(16, 185, 129, 0.4);
+  --shadow-palette: 0 25px 50px rgba(0, 0, 0, 0.5);
+  --shadow-dropdown: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --overlay-bg: rgba(0, 0, 0, 0.6);
+  --overlay-bg-light: rgba(0, 0, 0, 0.5);
+
+  /* Accent transparencies */
+  --color-work-alpha-10: rgba(16, 185, 129, 0.1);
+  --color-work-alpha-12: rgba(16, 185, 129, 0.12);
+  --color-work-alpha-15: rgba(16, 185, 129, 0.15);
+  --color-error-alpha-10: rgba(239, 68, 68, 0.1);
+  --color-error-alpha-12: rgba(239, 68, 68, 0.12);
+  --card-hover-inset: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+  --card-hover-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+
+  /* Heatmap colors */
+  --heatmap-empty: var(--bg-hover);
+  --heatmap-low: #065f46;
+  --heatmap-mid: #047857;
+  --heatmap-high: #10b981;
+
+  /* Toggle knob */
+  --toggle-knob-bg: #ffffff;
+
+  /* Date input color scheme */
+  --date-color-scheme: dark;
+
+  /* Sizing */
+  --sidebar-width: 56px;
+  --titlebar-height: 36px;
+
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+  --font-mono: "SF Mono", ui-monospace, monospace;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.2s ease;
+  --transition-slow: 0.3s ease;
+}
+
+/* ===== Light Theme ===== */
+[data-theme="light"] {
+  /* Background */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f4f4f5; /* zinc-100 */
+  --bg-card: #e4e4e7; /* zinc-200 */
+  --bg-hover: #d4d4d8; /* zinc-300 */
+
+  /* Text */
+  --text-primary: #18181b; /* zinc-900 */
+  --text-secondary: #52525b; /* zinc-600 */
+  --text-muted: #71717a; /* zinc-500 */
+
+  /* Borders */
+  --border-default: #d4d4d8; /* zinc-300 */
+  --border-subtle: #e4e4e7; /* zinc-200 */
+
+  /* Accent colors by timer state (slightly adjusted for light bg contrast) */
+  --color-work: #059669; /* emerald-600 */
+  --color-work-dim: #a7f3d0; /* emerald-200 */
+  --color-short-break: #0284c7; /* sky-600 */
+  --color-short-break-dim: #bae6fd; /* sky-200 */
+  --color-long-break: #7c3aed; /* violet-600 */
+  --color-long-break-dim: #ddd6fe; /* violet-200 */
+
+  /* Priority colors (slightly darker for light bg) */
+  --color-priority-high: #dc2626; /* red-600 */
+  --color-priority-medium: #d97706; /* amber-600 */
+  --color-priority-low: #2563eb; /* blue-600 */
+
+  /* Semantic / derived colors */
+  --color-success: #059669;
+  --color-error: #dc2626;
+  --color-status-neutral: #a1a1aa;
+
+  /* Shadows & overlays */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-toast: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --shadow-fab: 0 4px 12px rgba(5, 150, 105, 0.25);
+  --shadow-fab-hover: 0 6px 20px rgba(5, 150, 105, 0.35);
+  --shadow-palette: 0 25px 50px rgba(0, 0, 0, 0.15);
+  --shadow-dropdown: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --overlay-bg: rgba(0, 0, 0, 0.3);
+  --overlay-bg-light: rgba(0, 0, 0, 0.2);
+
+  /* Accent transparencies */
+  --color-work-alpha-10: rgba(5, 150, 105, 0.1);
+  --color-work-alpha-12: rgba(5, 150, 105, 0.12);
+  --color-work-alpha-15: rgba(5, 150, 105, 0.15);
+  --color-error-alpha-10: rgba(220, 38, 38, 0.1);
+  --color-error-alpha-12: rgba(220, 38, 38, 0.12);
+  --card-hover-inset: inset 0 0 0 1px rgba(0, 0, 0, 0.04);
+  --card-hover-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+  /* Heatmap colors */
+  --heatmap-empty: #e4e4e7;
+  --heatmap-low: #a7f3d0;
+  --heatmap-mid: #6ee7b7;
+  --heatmap-high: #059669;
+
+  /* Toggle knob */
+  --toggle-knob-bg: #ffffff;
+
+  /* Date input color scheme */
+  --date-color-scheme: light;
+}
