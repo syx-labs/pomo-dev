@@ -12,6 +12,9 @@ on:
 permissions:
   contents: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   create-release:
     runs-on: ubuntu-latest
@@ -65,11 +68,11 @@ jobs:
           - platform: macos-aarch64
             runner: macos-latest
           - platform: macos-x64
-            runner: macos-13
+            runner: macos-15
           - platform: windows-x64
             runner: windows-latest
           - platform: linux-x64
-            runner: ubuntu-22.04
+            runner: ubuntu-latest
     runs-on: ${{ matrix.runner }}
 
     steps:
@@ -87,22 +90,25 @@ jobs:
           workspaces: apps/pomodoro/src-tauri -> target
 
       - name: Install Linux dependencies
-        if: matrix.platform == 'linux-x64'
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
             librsvg2-dev \
             patchelf \
             libssl-dev \
             libayatana-appindicator3-dev \
             libasound2-dev
 
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2" --locked
+
       - name: Install Vite+
         run: npm install -g vite-plus
 
       - name: Bump version
+        shell: bash
         env:
           RELEASE_VERSION: ${{ needs.create-release.outputs.version }}
         run: node scripts/bump-version.mjs "$RELEASE_VERSION"
@@ -111,10 +117,11 @@ jobs:
         run: vp install
 
       - name: Build Tauri app
+        shell: bash
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: vp run pomodoro#tauri build
+        run: cargo tauri build
 
       - name: Upload release artifacts
         uses: softprops/action-gh-release@v2
@@ -152,36 +159,12 @@ jobs:
           # Get the release assets
           ASSETS=$(gh release view "$TAG" --json assets --jq '.assets')
 
-          # Helper: find asset URL and signature
-          find_asset() {
-            local pattern="$1"
-            echo "$ASSETS" | jq -r ".[] | select(.name | test(\"${pattern}\")) | .url" | head -1
-          }
-          find_sig() {
-            local pattern="$1"
-            local sig_url
-            sig_url=$(echo "$ASSETS" | jq -r ".[] | select(.name | test(\"${pattern}\\.sig$\")) | .url" | head -1)
-            if [ -n "$sig_url" ]; then
-              gh api "$sig_url" -H "Accept: application/octet-stream" 2>/dev/null || echo ""
-            fi
-          }
-
-          # Get download URLs (browser_download_url)
-          get_download_url() {
-            local pattern="$1"
-            echo "$ASSETS" | jq -r ".[] | select(.name | test(\"${pattern}\")) | .url" | head -1
-          }
-
-          # Build platform entries
-          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
           # Collect signatures from .sig files
           DARWIN_AARCH64_SIG=""
           DARWIN_X86_64_SIG=""
           WINDOWS_X86_64_SIG=""
           LINUX_X86_64_SIG=""
 
-          # Download signature files
           for asset in $(echo "$ASSETS" | jq -r '.[] | select(.name | endswith(".sig")) | .name'); do
             SIG_CONTENT=$(gh release download "$TAG" --pattern "$asset" --output - 2>/dev/null || echo "")
             case "$asset" in
@@ -192,13 +175,14 @@ jobs:
             esac
           done
 
-          # Get download URLs
+          # Get download URLs (browser_download_url)
           DARWIN_AARCH64_URL=$(echo "$ASSETS" | jq -r '[.[] | select(.name | test("aarch64.*app\\.tar\\.gz$"))] | .[0].url // empty')
           DARWIN_X86_64_URL=$(echo "$ASSETS" | jq -r '[.[] | select(.name | test("(x64|x86_64).*app\\.tar\\.gz$"))] | .[0].url // empty')
           WINDOWS_X86_64_URL=$(echo "$ASSETS" | jq -r '[.[] | select(.name | test("x64.*setup.*\\.exe$"))] | .[0].url // empty')
           LINUX_X86_64_URL=$(echo "$ASSETS" | jq -r '[.[] | select(.name | test("(amd64|x86_64).*\\.AppImage$"))] | .[0].url // empty')
 
           # Build latest.json
+          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           PLATFORMS="{}"
 
           add_platform() {
@@ -217,10 +201,8 @@ jobs:
           add_platform "windows-x86_64" "$WINDOWS_X86_64_URL" "$WINDOWS_X86_64_SIG"
           add_platform "linux-x86_64" "$LINUX_X86_64_URL" "$LINUX_X86_64_SIG"
 
-          # Get release notes
           NOTES=$(gh release view "$TAG" --json body --jq '.body')
 
-          # Create latest.json
           jq -n \
             --arg version "$VERSION" \
             --arg notes "$NOTES" \
@@ -230,8 +212,6 @@ jobs:
             > latest.json
 
           cat latest.json
-
-          # Upload latest.json to the release
           gh release upload "$TAG" latest.json --clobber
 
       - name: Publish release
