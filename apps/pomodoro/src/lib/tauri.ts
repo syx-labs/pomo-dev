@@ -34,6 +34,9 @@ const RETRYABLE_COMMANDS = new Set([
   "get_session_debrief",
   "get_weekly_report",
   "get_settings_advice",
+  "ollama_check_health",
+  "ollama_list_local_models",
+  "ollama_get_curated_models",
 ]);
 
 const RETRY_DELAY_MS = 500;
@@ -348,3 +351,49 @@ export const testIntegration = (id: string) => ipc<string>("test_integration", {
 
 export const getEventLog = (integrationId?: string, limit?: number) =>
   ipc<EventLogEntry[]>("get_event_log", { integrationId, limit });
+
+// Ollama model management types
+export interface OllamaModel {
+  name: string;
+  size: number;
+  modified_at: string;
+}
+
+export type ModelCategory = "fast" | "balanced" | "capable";
+
+export interface CuratedModel {
+  name: string;
+  display_name: string;
+  description: string;
+  size_mb: number;
+  category: ModelCategory;
+}
+
+export interface PullProgress {
+  model: string;
+  status: string;
+  total: number;
+  completed: number;
+  percent: number;
+}
+
+export interface PullComplete {
+  model: string;
+  success: boolean;
+  error: string | null;
+}
+
+// Ollama commands
+export const ollamaCheckHealth = () => ipc<boolean>("ollama_check_health");
+export const ollamaListLocalModels = () => ipc<OllamaModel[]>("ollama_list_local_models");
+export const ollamaGetCuratedModels = () => ipc<CuratedModel[]>("ollama_get_curated_models");
+export const ollamaPullModel = (name: string) => ipc<void>("ollama_pull_model", { name });
+export const ollamaCancelPull = () => ipc<void>("ollama_cancel_pull");
+export const ollamaDeleteModel = (name: string) => ipc<void>("ollama_delete_model", { name });
+
+// Ollama event listeners
+export const onOllamaPullProgress = (callback: (payload: PullProgress) => void) =>
+  listen<PullProgress>("ollama:pull-progress", (event) => callback(event.payload));
+
+export const onOllamaPullComplete = (callback: (payload: PullComplete) => void) =>
+  listen<PullComplete>("ollama:pull-complete", (event) => callback(event.payload));

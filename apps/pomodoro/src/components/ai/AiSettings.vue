@@ -2,6 +2,7 @@
 import { onMounted, ref, watch } from "vue";
 import { getAllSettings, setSetting, invokeAiCommand } from "@/lib/tauri";
 import { useToast } from "@/composables/useToast";
+import OllamaModels from "./OllamaModels.vue";
 
 const { showToast } = useToast();
 
@@ -163,6 +164,8 @@ async function testConnection() {
         </template>
         <template v-else>Test Connection</template>
       </button>
+
+      <OllamaModels v-if="provider === 'ollama'" />
     </template>
   </div>
 </template>
