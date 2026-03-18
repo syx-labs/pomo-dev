@@ -82,7 +82,7 @@ fn main() {
                 db: Mutex::new(conn),
                 audio: Mutex::new(audio_engine),
                 shutdown: shutdown.clone(),
-                ollama_cancel: Arc::new(AtomicBool::new(false)),
+                ollama_cancel: Mutex::new(Arc::new(AtomicBool::new(false))),
                 dispatcher: integrations::EventDispatcher::new(),
             };
             app.manage(state);

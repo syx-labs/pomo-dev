@@ -174,8 +174,9 @@ fn pull_model_inner(
     name: &str,
     cancel: &AtomicBool,
 ) -> Result<(), String> {
-    // No timeout — model downloads can take a long time
+    // 5-minute timeout allows cancel checks to take effect if connection stalls
     let client = Client::builder()
+        .timeout(Duration::from_secs(300))
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {e}"))?;
 

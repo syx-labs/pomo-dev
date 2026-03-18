@@ -25,7 +25,7 @@ pub struct AppState {
     pub db: Mutex<Connection>,
     pub audio: Mutex<AudioEngine>,
     pub shutdown: Arc<AtomicBool>,
-    pub ollama_cancel: Arc<AtomicBool>,
+    pub ollama_cancel: Mutex<Arc<AtomicBool>>,
     pub dispatcher: EventDispatcher,
 }
 
@@ -1036,7 +1036,7 @@ fn get_ollama_base_url(conn: &Connection) -> Result<String, String> {
     db::get_setting(conn, "ai_base_url")
         .map_err(|e| e.to_string())
         .map(|v| match v {
-            Some(s) if !s.trim().is_empty() => s,
+            Some(s) if !s.trim().is_empty() => s.trim().to_string(),
             _ => "http://localhost:11434".into(),
         })
 }
@@ -1074,8 +1074,11 @@ pub fn ollama_pull_model(
     let base_url = get_ollama_base_url(&conn)?;
     drop(conn);
 
-    state.ollama_cancel.store(false, Ordering::Relaxed);
-    let cancel = state.ollama_cancel.clone();
+    let cancel = Arc::new(AtomicBool::new(false));
+    {
+        let mut guard = state.ollama_cancel.lock().map_err(|e| e.to_string())?;
+        *guard = cancel.clone();
+    }
 
     ollama::pull_model(app_handle, base_url, name, cancel);
     Ok(())
@@ -1083,7 +1086,8 @@ pub fn ollama_pull_model(
 
 #[tauri::command]
 pub fn ollama_cancel_pull(state: State<'_, AppState>) -> Result<(), String> {
-    state.ollama_cancel.store(true, Ordering::Relaxed);
+    let guard = state.ollama_cancel.lock().map_err(|e| e.to_string())?;
+    guard.store(true, Ordering::Relaxed);
     Ok(())
 }
 

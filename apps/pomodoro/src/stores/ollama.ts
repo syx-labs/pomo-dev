@@ -109,8 +109,7 @@ export const useOllamaStore = defineStore("ollama", () => {
       await ollamaDeleteModel(name);
       await fetchLocalModels();
       if (activeModel.value === name) {
-        await setSetting("ai_model", "");
-        activeModel.value = "";
+        await setActiveModel("");
       }
     } finally {
       deleting.value = null;
@@ -140,10 +139,8 @@ export const useOllamaStore = defineStore("ollama", () => {
   async function init() {
     await setupEventListeners();
     // Fetch curated models (local) and check health (network) in parallel
+    // checkHealth() auto-loads models when Ollama transitions to running
     await Promise.all([fetchCuratedModels(), checkHealth()]);
-    if (isRunning.value) {
-      await Promise.all([fetchLocalModels(), loadActiveModel()]);
-    }
   }
 
   return {
