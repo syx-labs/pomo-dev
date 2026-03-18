@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use chrono::Utc;
-use rusqlite::Connection;
+use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 use uuid::Uuid;
@@ -187,7 +187,7 @@ pub fn update_task(
     };
 
     let now = Utc::now().to_rfc3339();
-    let task = Task {
+    let mut task = Task {
         id: input.id,
         title: input.title,
         description: input.description,
@@ -197,16 +197,21 @@ pub fn update_task(
         due_date: input.due_date,
         estimated_pomos: input.estimated_pomos,
         sort_order: input.sort_order,
-        created_at: String::new(), // not updated
+        created_at: String::new(), // populated from DB below
         updated_at: now,
     };
 
-    let old_status = {
+    let (old_status, created_at) = {
         let conn = state.db.lock_or_err("update_task_read")?;
         let old = db::get_task_status(&conn, &task.id).map_err(|e| e.to_string())?;
+        // Fetch the original created_at before updating
+        let created_at: String = conn
+            .query_row("SELECT created_at FROM tasks WHERE id = ?1", params![task.id], |row| row.get(0))
+            .unwrap_or_default();
         db::update_task(&conn, &task).map_err(|e| e.to_string())?;
-        old
+        (old, created_at)
     };
+    task.created_at = created_at;
 
     // Emit task.completed only when transitioning TO "done"
     if task.status == TaskStatus::Done && old_status.as_deref() != Some("done") {
@@ -263,7 +268,6 @@ pub fn start_pomodoro_for_task(
     state: State<'_, AppState>,
     task_id: String,
 ) -> Result<TimerState, String> {
-    // Phase 2B: Lock timer first, modify in-memory state, get what we need, drop lock
     let (session_id, session_type_str, duration) = {
         let mut timer = state.timer.lock_or_err("start_pomodoro_for_task")?;
         let session_id = Uuid::new_v4().to_string();
@@ -386,7 +390,7 @@ pub fn set_setting(
     db::set_setting(&conn, &key, &value).map_err(|e| e.to_string())?;
     drop(conn);
 
-    // Phase 2D: Sync timer-related settings live
+    // Sync timer-related settings live
     // Frontend stores durations in MINUTES; Rust timer uses SECONDS
     match key.as_str() {
         "work_duration" | "short_break_duration" | "long_break_duration"
@@ -493,7 +497,7 @@ pub fn get_weekly_stats(
     let start_ts = format!("{}T00:00:00+00:00", start_naive.format("%Y-%m-%d"));
     let end_ts = format!("{}T00:00:00+00:00", end_naive.format("%Y-%m-%d"));
 
-    // Phase 4: Single aggregated query instead of 7 separate queries
+    // Single aggregated query instead of 7 separate queries
     let aggregated =
         db::get_weekly_stats_aggregated(&conn, &start_ts, &end_ts).map_err(|e| e.to_string())?;
 
@@ -621,6 +625,7 @@ pub fn invoke_ai_command(
         .unwrap_or_default();
     let base_url = db::get_setting(&conn, "ai_base_url")
         .map_err(|e| e.to_string())?
+        .map(|s| s.trim().to_string())
         .unwrap_or_else(|| "http://localhost:11434".into());
     drop(conn); // Release lock before HTTP call
 
@@ -646,6 +651,8 @@ pub fn get_daily_briefing(state: State<'_, AppState>) -> Result<ai::AiBriefing, 
             .unwrap_or_default();
         let base_url = db::get_setting(&conn, "ai_base_url")
             .map_err(|e| e.to_string())?
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
             .unwrap_or_else(|| "http://localhost:11434".into());
         (ctx, provider_type, api_key, model, base_url)
     };
@@ -691,6 +698,8 @@ pub fn get_session_debrief(
             .unwrap_or_default();
         let base_url = db::get_setting(&conn, "ai_base_url")
             .map_err(|e| e.to_string())?
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
             .unwrap_or_else(|| "http://localhost:11434".into());
         (ctx, provider_type, api_key, model, base_url)
     };
@@ -726,6 +735,8 @@ pub fn get_weekly_report(state: State<'_, AppState>) -> Result<ai::AiReport, Str
             .unwrap_or_default();
         let base_url = db::get_setting(&conn, "ai_base_url")
             .map_err(|e| e.to_string())?
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
             .unwrap_or_else(|| "http://localhost:11434".into());
         (ctx, provider_type, api_key, model, base_url)
     };
@@ -761,7 +772,8 @@ pub fn get_settings_advice(state: State<'_, AppState>) -> Result<Vec<ai::Setting
         let model_val = settings.get("ai_model").cloned().unwrap_or_default();
         let base_url = settings
             .get("ai_base_url")
-            .cloned()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
             .unwrap_or_else(|| "http://localhost:11434".into());
         (ctx, settings, provider_type, api_key, model_val, base_url)
     };
@@ -773,8 +785,8 @@ pub fn get_settings_advice(state: State<'_, AppState>) -> Result<Vec<ai::Setting
     let provider = ai::create_provider(&provider_type, &api_key, &model, &base_url);
 
     let work_min = settings.get("work_duration").and_then(|v| v.parse::<i32>().ok()).unwrap_or(25);
-    let short_min = settings.get("short_break").and_then(|v| v.parse::<i32>().ok()).unwrap_or(5);
-    let long_min = settings.get("long_break").and_then(|v| v.parse::<i32>().ok()).unwrap_or(15);
+    let short_min = settings.get("short_break_duration").and_then(|v| v.parse::<i32>().ok()).unwrap_or(5);
+    let long_min = settings.get("long_break_duration").and_then(|v| v.parse::<i32>().ok()).unwrap_or(15);
     let cycles = settings.get("cycles_before_long_break").and_then(|v| v.parse::<i32>().ok()).unwrap_or(4);
 
     let prompt = ai::SETTINGS_ADVISOR_PROMPT

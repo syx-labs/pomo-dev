@@ -32,7 +32,7 @@ const defaults: AppSettings = {
   accent_color: "emerald",
 };
 
-// Validation ranges for numeric settings (in seconds where applicable)
+// Validation ranges for numeric settings (values are in minutes for durations)
 const CLAMP_RANGES: Partial<Record<keyof AppSettings, [number, number]>> = {
   work_duration: [1, 120], // 1-120 minutes (60-7200 seconds)
   short_break_duration: [1, 30], // 1-30 minutes (60-1800 seconds)
@@ -107,9 +107,16 @@ export const useSettingsStore = defineStore("settings", () => {
   }
 
   async function resetToDefaults() {
-    for (const [key, value] of Object.entries(defaults)) {
-      (settings as Record<string, unknown>)[key] = value;
-      await setSetting(key, String(value));
+    const previousSettings = { ...settings };
+    try {
+      for (const [key, value] of Object.entries(defaults)) {
+        (settings as Record<string, unknown>)[key] = value;
+        await setSetting(key, String(value));
+      }
+    } catch {
+      // Revert all settings on failure
+      Object.assign(settings, previousSettings);
+      showToast("Failed to reset settings", "error");
     }
   }
 

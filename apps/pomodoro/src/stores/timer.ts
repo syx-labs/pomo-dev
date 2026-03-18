@@ -170,14 +170,14 @@ export const useTimerStore = defineStore("timer", () => {
     }
   }
 
-  let unlistenTick: (() => void) | null = null;
-  let unlistenComplete: (() => void) | null = null;
+  const unlistenTick = ref<(() => void) | null>(null);
+  const unlistenComplete = ref<(() => void) | null>(null);
 
   async function setupListeners() {
     // Clean up any existing listeners before registering new ones
     cleanup();
 
-    unlistenTick = await onTimerTick((payload) => {
+    unlistenTick.value = await onTimerTick((payload) => {
       const prevStatus = state.value.status;
       state.value = payload;
 
@@ -193,19 +193,19 @@ export const useTimerStore = defineStore("timer", () => {
         }
       }
     });
-    unlistenComplete = await onTimerComplete((payload) => {
+    unlistenComplete.value = await onTimerComplete((payload) => {
       if (payload.sessionType === "work") {
         const aiStore = useAiStore();
-        void aiStore.fetchDebrief(payload.sessionType, state.value.current_cycle);
+        void aiStore.fetchDebrief(payload.sessionType);
       }
     });
   }
 
   function cleanup() {
-    unlistenTick?.();
-    unlistenComplete?.();
-    unlistenTick = null;
-    unlistenComplete = null;
+    unlistenTick.value?.();
+    unlistenComplete.value?.();
+    unlistenTick.value = null;
+    unlistenComplete.value = null;
   }
 
   return {

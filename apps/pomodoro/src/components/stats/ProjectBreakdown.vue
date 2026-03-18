@@ -21,20 +21,20 @@ function hashColor(name: string): string {
   return `hsl(${hue}, 55%, 55%)`;
 }
 
-const totalSecs = computed(() => props.data.reduce((sum, p) => sum + p.total_work_secs, 0));
+const totalSecs = computed(() => props.data.reduce((sum, p) => sum + p.total_secs, 0));
 
 const segments = computed(() => {
   if (totalSecs.value === 0) return [];
   let offset = 0;
   return props.data.map((p) => {
-    const ratio = p.total_work_secs / totalSecs.value;
+    const ratio = p.total_secs / totalSecs.value;
     const dashArray = CIRCUMFERENCE * ratio;
     const dashOffset = -offset;
     offset += dashArray;
     return {
       project: p.project,
-      sessions: p.total_sessions,
-      secs: p.total_work_secs,
+      sessions: p.sessions,
+      secs: p.total_secs,
       percentage: Math.round(ratio * 100),
       color: hashColor(p.project),
       dashArray: `${dashArray} ${CIRCUMFERENCE - dashArray}`,
