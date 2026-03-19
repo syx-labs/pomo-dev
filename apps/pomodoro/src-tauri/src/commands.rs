@@ -326,19 +326,15 @@ pub fn complete_pomodoro(
     state: State<'_, AppState>,
 ) -> Result<TimerState, String> {
     let (session_id, was_running, session_type) = {
-        let mut timer = state.timer.lock_or_err("complete_pomodoro")?;
+        let timer = state.timer.lock_or_err("complete_pomodoro")?;
         let was_running = timer.status == crate::models::TimerStatus::Running
             || timer.status == crate::models::TimerStatus::Paused;
         let session_id = timer.current_session_id.clone();
         let session_type = timer.session_type.as_str().to_string();
-
-        // Reset the timer (advances to idle, clears linked task)
-        timer.reset();
-
         (session_id, was_running, session_type)
     };
 
-    // Mark session as completed in DB if there was an active session
+    // Persist session completion BEFORE resetting the timer
     let session_persisted = if was_running {
         if let Some(sid) = session_id {
             let ended_at = Utc::now().to_rfc3339();
@@ -351,6 +347,12 @@ pub fn complete_pomodoro(
     } else {
         false
     };
+
+    // Reset the timer only after successful DB persistence
+    {
+        let mut timer = state.timer.lock_or_err("complete_pomodoro_reset")?;
+        timer.reset();
+    }
 
     let result = {
         let timer = state.timer.lock_or_err("complete_pomodoro_state")?;
@@ -370,10 +372,12 @@ pub fn complete_pomodoro(
         );
 
         // Emit timer:complete so the frontend opens the debrief (matches natural completion in main.rs)
-        let _ = app_handle.emit(
+        if let Err(err) = app_handle.emit(
             "timer:complete",
             serde_json::json!({ "sessionType": session_type }),
-        );
+        ) {
+            eprintln!("failed to emit timer:complete: {err}");
+        }
     }
 
     Ok(result)
@@ -472,13 +476,14 @@ pub fn get_daily_stats(
 
     let sessions = db::get_sessions_in_range(&conn, &start, &end).map_err(|e| e.to_string())?;
 
-    let total_sessions = sessions.len();
+    let mut total_sessions = 0usize;
     let mut total_work_secs = 0i32;
     let mut total_break_secs = 0i32;
 
     for s in &sessions {
         if s.session_type == SessionType::Work {
             total_work_secs += s.duration_secs;
+            total_sessions += 1;
         } else {
             total_break_secs += s.duration_secs;
         }
