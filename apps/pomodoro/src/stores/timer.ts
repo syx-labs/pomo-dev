@@ -85,14 +85,10 @@ export const useTimerStore = defineStore("timer", () => {
 
   /** Re-read timer state from the backend (e.g. after settings change). */
   async function refreshState() {
-    try {
-      state.value = (await getTimerState()) as TimerState;
-      // When idle the remaining_secs IS the total duration
-      if (state.value.status === "idle") {
-        totalDurations.value[state.value.session_type] = state.value.remaining_secs;
-      }
-    } catch {
-      // non-fatal
+    state.value = (await getTimerState()) as TimerState;
+    // When idle the remaining_secs IS the total duration
+    if (state.value.status === "idle") {
+      totalDurations.value[state.value.session_type] = state.value.remaining_secs;
     }
   }
 

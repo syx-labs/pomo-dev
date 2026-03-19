@@ -339,20 +339,25 @@ pub fn complete_pomodoro(
     };
 
     // Mark session as completed in DB if there was an active session
-    if was_running {
+    let session_persisted = if was_running {
         if let Some(sid) = session_id {
             let ended_at = Utc::now().to_rfc3339();
             let conn = state.db.lock_or_err("complete_pomodoro_db")?;
-            let _ = db::complete_session(&conn, &sid, &ended_at);
+            db::complete_session(&conn, &sid, &ended_at).map_err(|e| e.to_string())?;
+            true
+        } else {
+            false
         }
-    }
+    } else {
+        false
+    };
 
     let result = {
         let timer = state.timer.lock_or_err("complete_pomodoro_state")?;
         timer.get_state()
     };
 
-    if was_running {
+    if session_persisted {
         state.dispatcher.dispatch(
             &state.db,
             AppEvent {
@@ -516,9 +521,9 @@ pub fn get_weekly_stats(
     let mut day_map: HashMap<String, (i32, i32, usize)> = HashMap::new();
     for stat in &aggregated {
         let entry = day_map.entry(stat.day.clone()).or_insert((0, 0, 0));
-        entry.2 += stat.count;
         if stat.session_type == SessionType::Work {
             entry.0 += stat.total_secs;
+            entry.2 += stat.count;
         } else {
             entry.1 += stat.total_secs;
         }
@@ -634,11 +639,7 @@ pub fn invoke_ai_command(
     let model = db::get_setting(&conn, "ai_model")
         .map_err(|e| e.to_string())?
         .unwrap_or_default();
-    let base_url = db::get_setting(&conn, "ai_base_url")
-        .map_err(|e| e.to_string())?
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| "http://localhost:11434".into());
+    let base_url = get_ollama_base_url(&conn)?;
     drop(conn); // Release lock before HTTP call
 
     let provider = ai::create_provider(&provider_type, &api_key, &model, &base_url);
@@ -661,11 +662,7 @@ pub fn get_daily_briefing(state: State<'_, AppState>) -> Result<ai::AiBriefing, 
         let model = db::get_setting(&conn, "ai_model")
             .map_err(|e| e.to_string())?
             .unwrap_or_default();
-        let base_url = db::get_setting(&conn, "ai_base_url")
-            .map_err(|e| e.to_string())?
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| "http://localhost:11434".into());
+        let base_url = get_ollama_base_url(&conn)?;
         (ctx, provider_type, api_key, model, base_url)
     };
 
@@ -708,11 +705,7 @@ pub fn get_session_debrief(
         let model = db::get_setting(&conn, "ai_model")
             .map_err(|e| e.to_string())?
             .unwrap_or_default();
-        let base_url = db::get_setting(&conn, "ai_base_url")
-            .map_err(|e| e.to_string())?
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| "http://localhost:11434".into());
+        let base_url = get_ollama_base_url(&conn)?;
         (ctx, provider_type, api_key, model, base_url)
     };
 
@@ -745,11 +738,7 @@ pub fn get_weekly_report(state: State<'_, AppState>) -> Result<ai::AiReport, Str
         let model = db::get_setting(&conn, "ai_model")
             .map_err(|e| e.to_string())?
             .unwrap_or_default();
-        let base_url = db::get_setting(&conn, "ai_base_url")
-            .map_err(|e| e.to_string())?
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| "http://localhost:11434".into());
+        let base_url = get_ollama_base_url(&conn)?;
         (ctx, provider_type, api_key, model, base_url)
     };
 
