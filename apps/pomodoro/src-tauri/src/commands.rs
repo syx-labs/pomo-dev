@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use chrono::Utc;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use tauri::{Emitter, State};
 use uuid::Uuid;
 
 use crate::ai;
@@ -206,8 +206,12 @@ pub fn update_task(
         let old = db::get_task_status(&conn, &task.id).map_err(|e| e.to_string())?;
         // Fetch the original created_at before updating
         let created_at: String = conn
-            .query_row("SELECT created_at FROM tasks WHERE id = ?1", params![task.id], |row| row.get(0))
-            .unwrap_or_default();
+            .query_row(
+                "SELECT created_at FROM tasks WHERE id = ?1",
+                params![&task.id],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
         db::update_task(&conn, &task).map_err(|e| e.to_string())?;
         (old, created_at)
     };
@@ -318,6 +322,7 @@ pub fn start_pomodoro_for_task(
 
 #[tauri::command]
 pub fn complete_pomodoro(
+    app_handle: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<TimerState, String> {
     let (session_id, was_running, session_type) = {
@@ -357,6 +362,12 @@ pub fn complete_pomodoro(
                 }),
                 timestamp: Utc::now().to_rfc3339(),
             },
+        );
+
+        // Emit timer:complete so the frontend opens the debrief (matches natural completion in main.rs)
+        let _ = app_handle.emit(
+            "timer:complete",
+            serde_json::json!({ "sessionType": session_type }),
         );
     }
 
@@ -626,6 +637,7 @@ pub fn invoke_ai_command(
     let base_url = db::get_setting(&conn, "ai_base_url")
         .map_err(|e| e.to_string())?
         .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
         .unwrap_or_else(|| "http://localhost:11434".into());
     drop(conn); // Release lock before HTTP call
 

@@ -108,14 +108,29 @@ export const useSettingsStore = defineStore("settings", () => {
 
   async function resetToDefaults() {
     const previousSettings = { ...settings };
+    const persistedKeys: string[] = [];
     try {
       for (const [key, value] of Object.entries(defaults)) {
         (settings as Record<string, unknown>)[key] = value;
         await setSetting(key, String(value));
+        persistedKeys.push(key);
       }
+      const timerStore = useTimerStore();
+      await timerStore.refreshState();
     } catch {
-      // Revert all settings on failure
+      // Revert in-memory state
       Object.assign(settings, previousSettings);
+      // Best-effort revert of persisted keys
+      for (const key of persistedKeys.reverse()) {
+        try {
+          await setSetting(
+            key,
+            String((previousSettings as Record<string, unknown>)[key]),
+          );
+        } catch {
+          // ignore rollback failure
+        }
+      }
       showToast("Failed to reset settings", "error");
     }
   }
