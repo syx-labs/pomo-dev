@@ -87,6 +87,8 @@ impl PomodoroTimer {
 
     /// Decrements remaining time by one second.
     /// Returns `true` if the session just completed (remaining hit 0).
+    /// Note: callers should read `current_session_id` BEFORE calling tick(),
+    /// because advance_session() clears it.
     pub fn tick(&mut self) -> bool {
         if self.status != TimerStatus::Running {
             return false;

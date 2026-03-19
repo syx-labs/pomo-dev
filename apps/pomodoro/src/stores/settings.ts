@@ -32,7 +32,7 @@ const defaults: AppSettings = {
   accent_color: "emerald",
 };
 
-// Validation ranges for numeric settings (in seconds where applicable)
+// Validation ranges for numeric settings (values are in minutes for durations)
 const CLAMP_RANGES: Partial<Record<keyof AppSettings, [number, number]>> = {
   work_duration: [1, 120], // 1-120 minutes (60-7200 seconds)
   short_break_duration: [1, 30], // 1-30 minutes (60-1800 seconds)
@@ -107,9 +107,31 @@ export const useSettingsStore = defineStore("settings", () => {
   }
 
   async function resetToDefaults() {
-    for (const [key, value] of Object.entries(defaults)) {
-      (settings as Record<string, unknown>)[key] = value;
-      await setSetting(key, String(value));
+    const previousSettings = { ...settings };
+    const persistedKeys: string[] = [];
+    try {
+      for (const [key, value] of Object.entries(defaults)) {
+        (settings as Record<string, unknown>)[key] = value;
+        await setSetting(key, String(value));
+        persistedKeys.push(key);
+      }
+      const timerStore = useTimerStore();
+      await timerStore.refreshState();
+    } catch {
+      // Revert in-memory state
+      Object.assign(settings, previousSettings);
+      // Best-effort revert of persisted keys
+      for (const key of persistedKeys.reverse()) {
+        try {
+          await setSetting(
+            key,
+            String((previousSettings as Record<string, unknown>)[key]),
+          );
+        } catch {
+          // ignore rollback failure
+        }
+      }
+      showToast("Failed to reset settings", "error");
     }
   }
 

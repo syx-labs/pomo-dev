@@ -12,7 +12,7 @@ export class IpcError extends Error {
   }
 }
 
-// Read-only commands that are safe to retry
+// Read-only commands that are safe to retry (no side effects, no paid API calls)
 const RETRYABLE_COMMANDS = new Set([
   "list_tasks",
   "get_timer_state",
@@ -30,10 +30,6 @@ const RETRYABLE_COMMANDS = new Set([
   "list_sound_presets",
   "list_integrations",
   "get_event_log",
-  "get_daily_briefing",
-  "get_session_debrief",
-  "get_weekly_report",
-  "get_settings_advice",
   "ollama_check_health",
   "ollama_list_local_models",
   "ollama_get_curated_models",
@@ -210,8 +206,8 @@ export interface HourlyStats {
 
 export interface ProjectStats {
   project: string;
-  total_sessions: number;
-  total_work_secs: number;
+  sessions: number;
+  total_secs: number;
 }
 
 export interface Goal {
@@ -256,8 +252,8 @@ export interface SettingAdvice {
 
 // AI Coach commands
 export const getDailyBriefing = () => ipc<AiBriefing>("get_daily_briefing");
-export const getSessionDebrief = (sessionType: string, consecutiveCount: number) =>
-  ipc<AiDebrief>("get_session_debrief", { sessionType, consecutiveCount });
+export const getSessionDebrief = (sessionType: string) =>
+  ipc<AiDebrief>("get_session_debrief", { sessionType });
 export const getWeeklyReport = () => ipc<AiReport>("get_weekly_report");
 export const getSettingsAdvice = () => ipc<SettingAdvice[]>("get_settings_advice");
 
@@ -288,13 +284,13 @@ export interface PresetLayer {
 
 // Audio commands
 export const playSound = (name: string, volume: number) =>
-  ipc<void>("play_sound", { name, volume });
-export const stopSound = (name: string) => ipc<void>("stop_sound", { name });
+  ipc<AudioState>("play_sound", { name, volume });
+export const stopSound = (name: string) => ipc<AudioState>("stop_sound", { name });
 export const setSoundVolume = (name: string, volume: number) =>
-  ipc<void>("set_sound_volume", { name, volume });
-export const setMasterVolume = (volume: number) => ipc<void>("set_master_volume", { volume });
-export const fadeSounds = (direction: string) => ipc<void>("fade_sounds", { direction });
-export const stopAllSounds = () => ipc<void>("stop_all_sounds");
+  ipc<AudioState>("set_sound_volume", { name, volume });
+export const setMasterVolume = (volume: number) => ipc<AudioState>("set_master_volume", { volume });
+export const fadeSounds = (direction: string) => ipc<AudioState>("fade_sounds", { direction });
+export const stopAllSounds = () => ipc<AudioState>("stop_all_sounds");
 export const getAudioState = () => ipc<AudioState>("get_audio_state");
 export const getAvailableSounds = () => ipc<string[]>("get_available_sounds");
 
@@ -302,7 +298,7 @@ export const getAvailableSounds = () => ipc<string[]>("get_available_sounds");
 export const saveSoundPreset = (name: string, layers: string) =>
   ipc<SoundPreset>("save_sound_preset", { name, layers });
 export const listSoundPresets = () => ipc<SoundPreset[]>("list_sound_presets");
-export const loadSoundPreset = (id: string) => ipc<void>("load_sound_preset", { id });
+export const loadSoundPreset = (id: string) => ipc<AudioState>("load_sound_preset", { id });
 export const deleteSoundPreset = (id: string) => ipc<void>("delete_sound_preset", { id });
 
 // Integration types

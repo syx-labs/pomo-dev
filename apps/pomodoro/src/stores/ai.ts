@@ -56,9 +56,9 @@ export const useAiStore = defineStore("ai", () => {
     await fetchBriefing();
   }
 
-  async function fetchDebrief(sessionType: string, consecutiveCount: number) {
+  async function fetchDebrief(sessionType: string) {
     try {
-      debrief.value = await getSessionDebrief(sessionType, consecutiveCount);
+      debrief.value = await getSessionDebrief(sessionType);
       debriefVisible.value = true;
     } catch {
       // Silently fail — debrief is non-critical

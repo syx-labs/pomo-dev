@@ -37,7 +37,7 @@ fn main() {
             // Initialize database
             let conn = db::init_db(app.handle()).expect("Failed to initialize database");
 
-            // Phase 2C: Load settings from DB and apply to timer
+            // Load settings from DB and apply to timer
             // Frontend stores durations in MINUTES; Rust timer uses SECONDS
             let mut timer = PomodoroTimer::new();
             if let Ok(all_settings) = db::get_all_settings(&conn) {
@@ -73,7 +73,7 @@ fn main() {
                 }
             };
 
-            // Phase 5: Shutdown flag
+            // Shutdown flag
             let shutdown = Arc::new(AtomicBool::new(false));
 
             // Create shared state
@@ -149,7 +149,7 @@ fn main() {
 
                     let state = app_handle.state::<AppState>();
 
-                    // Phase 5: Check shutdown flag
+                    // Check shutdown flag
                     if state.shutdown.load(Ordering::Relaxed) {
                         break;
                     }
@@ -157,12 +157,17 @@ fn main() {
                     let lock_result = state.timer.lock_or_err("tick");
                     if let Ok(mut timer) = lock_result {
                         if timer.status == TimerStatus::Running {
+                            // Capture session info BEFORE tick(), because
+                            // advance_session() clears current_session_id
+                            let session_id_before = timer.current_session_id.clone();
+                            let session_type_before = timer.session_type.as_str().to_string();
+
                             let session_completed = timer.tick();
                             let timer_state = timer.get_state();
 
                             // If session completed, mark it in DB
                             if session_completed {
-                                if let Some(session_id) = timer.current_session_id.clone() {
+                                if let Some(session_id) = session_id_before {
                                     let ended_at = chrono::Utc::now().to_rfc3339();
                                     let db_lock = state.db.lock_or_err("tick_db");
                                     if let Ok(conn) = db_lock {
@@ -174,6 +179,14 @@ fn main() {
 
                             drop(timer);
                             let _ = app_handle.emit("timer:tick", &timer_state);
+
+                            // Emit timer:complete AFTER dropping the timer lock
+                            if session_completed {
+                                let _ = app_handle.emit(
+                                    "timer:complete",
+                                    serde_json::json!({ "sessionType": session_type_before }),
+                                );
+                            }
                         }
                     }
                 }
